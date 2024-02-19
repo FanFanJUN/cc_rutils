@@ -1,6 +1,16 @@
 // @ts-nocheck
+/*******
+ * @description 全屏工具util
+ *  <RScaleScreen height={1080} width={1920} bodyOverflowHidden={false} fullScreen isScale={S_C}>
+ *   内容
+ *  </RScaleScreen>
+ * @author @licai
+ * @constant 1981824361@qq.com
+ */
+import { useDebounceFn, useDeepCompareEffect } from "ahooks";
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import emitter from "#/utils/events";
 
 function nextTick(fn: () => void) {
   return Promise.resolve().then(fn);
@@ -39,24 +49,33 @@ interface Options {
   children?: ReactNode;
   autoScale?: IAutoScale;
   fullScreen?: boolean;
-  width: number | string;
-  height: number | string;
+  width?: number | string;
+  height?: number | string;
   bodyOverflowHidden?: boolean;
   delay?: number;
   boxStyle?: CSSProperties;
   wrapperStyle?: CSSProperties;
+  isScale?: boolean;
+  show?: boolean;
 }
 
-export default function RScaleScreen(props: Options) {
+function RScaleScreen(props: Options) {
   const {
-    width,
-    height,
+    width = 1920,
+    height = 1080,
     autoScale = true,
-    bodyOverflowHidden = true,
+    bodyOverflowHidden = false,
     delay = 500,
+    isScale = false,
+    fullScreen = true,
+    show,
   } = props;
+  if (!isScale) {
+    return <>{props.children}</>;
+  }
   let bodyOverflow: string;
   const elRef = useRef<HTMLDivElement>(null);
+  const [otherWidth, setOtherWidth] = useState(0);
   const [size, setSize] = useState({
     width,
     height,
@@ -69,7 +88,7 @@ export default function RScaleScreen(props: Options) {
       overflow: "hidden",
       backgroundSize: `100% 100%`,
       backgroundColor: `#000`,
-      width: `100vw`,
+      width: `100%`,
       height: `100vh`,
     },
     wrapper: {
@@ -86,10 +105,8 @@ export default function RScaleScreen(props: Options) {
   let observer: MutationObserver;
 
   function initBodyStyle() {
-    if (bodyOverflowHidden) {
-      bodyOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-    }
+    bodyOverflow = document.body.style.overflow;
+    document.body.style = "overflow-x: auto;overflow-y: clip;";
   }
 
   function initSize() {
@@ -106,7 +123,7 @@ export default function RScaleScreen(props: Options) {
   }
   function updateSize() {
     if (size.width && size.height) {
-      elRef.current!.style.width = `${size.width}px`;
+      elRef.current!.style.width = `calc(${size.width}px - ${otherWidth}px)`;
       elRef.current!.style.height = `${size.height}px`;
     } else {
       elRef.current!.style.width = `${size.originalWidth}px`;
@@ -131,16 +148,26 @@ export default function RScaleScreen(props: Options) {
   }
   function updateScale() {
     // 获取真实视口尺寸
-    const currentWidth = document.body.clientWidth;
+    const currentWidth = document.body.clientWidth - otherWidth;
     const currentHeight = document.body.clientHeight;
     // 获取大屏最终的宽高
-    const realWidth = size.width || size.originalWidth;
+    const realWidth = (size.width || size.originalWidth) - otherWidth;
     const realHeight = size.height || size.originalHeight;
     // 计算缩放比例
     const widthScale = currentWidth / +realWidth;
     const heightScale = currentHeight / +realHeight;
     // 若要铺满全屏，则按照各自比例缩放
-    if (props.fullScreen) {
+    if (fullScreen) {
+      const ele = document.querySelectorAll('[data-id-sc="sc"]');
+      ele.forEach((item) => {
+        if (heightScale === 1 || widthScale === 1) {
+          item.style.transform = `scale(${heightScale},${widthScale})`;
+        } else {
+          item.style.transform = `scale(${heightScale + 0.2},${
+            widthScale + 0.2
+          })`;
+        }
+      });
       elRef.current!.style.transform = `scale(${widthScale},${heightScale})`;
       return false;
     }
@@ -175,7 +202,54 @@ export default function RScaleScreen(props: Options) {
     updateScale();
     window.addEventListener("resize", onResize);
   }
+
+  const setWidth = () => {
+    const w = document.querySelector('aside[class~="ant-layout-sider"]')?.style
+      ?.width;
+    const width = Number(w?.split("px")?.[0] || 0);
+    width && setOtherWidth(width);
+  };
+
+  const { run } = useDebounceFn(
+    () => {
+      setWidth();
+    },
+    {
+      wait: 500,
+    }
+  );
+
+  const onFullscreenchange = () => {
+    if (document.fullscreenElement) {
+      setOtherWidth(0);
+    } else {
+      run();
+    }
+  };
+
+  const _onHandleResize = (collapsed: boolean) => {
+    if (collapsed) {
+      setOtherWidth(48);
+    } else {
+      setOtherWidth(208);
+    }
+  };
+
   useEffect(() => {
+    const resizeObserver = new ResizeObserver(() => {
+      run();
+    });
+    const ele = document.querySelector('aside[class~="ant-layout-sider"]');
+    // 监听元素
+    ele && resizeObserver.observe(ele);
+    document.addEventListener("fullscreenchange", onFullscreenchange);
+    emitter.addListener("onChangeMnue", _onHandleResize);
+    return () => {
+      emitter.removeListener("onChangeMnue", _onHandleResize);
+    };
+  }, []);
+
+  useDeepCompareEffect(() => {
     initState();
     return () => {
       observer.disconnect();
@@ -184,9 +258,12 @@ export default function RScaleScreen(props: Options) {
         document.body.style.overflow = bodyOverflow;
       }
     };
-  }, []);
+  }, [otherWidth, show]);
 
-  // tslint: disable
+  /* useEffect(() => {
+    initBodyStyle();
+  }, [bodyOverflowHidden]); */
+
   return (
     <div
       style={{ ...styles.box, ...props.boxStyle }}
@@ -202,3 +279,4 @@ export default function RScaleScreen(props: Options) {
     </div>
   );
 }
+export default memo(RScaleScreen);

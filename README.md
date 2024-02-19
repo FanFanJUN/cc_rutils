@@ -16,6 +16,7 @@ $ npm install cc_rutils
 
 - RScaleScreen 大屏自适应工具
 - js计算 解决浮动运算问题，避免小数点后产生多位数和计算精度损
+- 自定义hooks  >> useRem
 
 ## LICENSE
 

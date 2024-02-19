@@ -23,8 +23,10 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "homepage": "https://github.com/FanFanJUN/cc_rutils",
   "devDependencies": {
     "father": "^4.4.0",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "ahooks": "~3.7.10"
   }
 }
