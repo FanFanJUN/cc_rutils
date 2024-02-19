@@ -10,7 +10,7 @@
 import { useDebounceFn, useDeepCompareEffect } from "ahooks";
 import type { CSSProperties, ReactNode } from "react";
 import { memo, useEffect, useRef, useState } from "react";
-import emitter from "#/utils/events";
+import emitter from "../utils/events.js";
 
 function nextTick(fn: () => void) {
   return Promise.resolve().then(fn);
